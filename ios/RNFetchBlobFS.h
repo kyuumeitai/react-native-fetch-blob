@@ -50,6 +50,7 @@
 + (NSString *) getTempPath;
 + (NSString *) getCacheDir;
 + (NSString *) getDocumentDir;
++ (NSString *) getLibraryDir;
 + (NSString *) getTempPath:(NSString*)taskId withExtension:(NSString *)ext;
 + (NSString *) getPathOfAsset:(NSString *)assetURI;
 + (NSString *) getPathForAppGroup:(NSString *)groupName;

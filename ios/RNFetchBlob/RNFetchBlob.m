@@ -66,7 +66,8 @@ RCT_EXPORT_MODULE();
     return @{
              @"MainBundleDir" : [RNFetchBlobFS getMainBundleDir],
              @"DocumentDir": [RNFetchBlobFS getDocumentDir],
-             @"CacheDir" : [RNFetchBlobFS getCacheDir]
+             @"CacheDir" : [RNFetchBlobFS getCacheDir],
+             @"LibraryDir" : [RNFetchBlobFS getLibraryDir]
              };
 }
 
@@ -573,13 +574,14 @@ RCT_EXPORT_METHOD(previewDocument:(NSString*)uri scheme:(NSString *)scheme resol
 
 # pragma mark - open file with UIDocumentInteractionController and delegate
 
-RCT_EXPORT_METHOD(openDocument:(NSString*)uri scheme:(NSString *)scheme resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXPORT_METHOD(openDocument:(NSString*)uri scheme:(NSString *)scheme name:(NSString*)name resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 {
     NSString * utf8uri = [uri stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
     NSURL * url = [[NSURL alloc] initWithString:utf8uri];
     // NSURL * url = [[NSURL alloc] initWithString:uri];
     documentController = [UIDocumentInteractionController interactionControllerWithURL:url];
     documentController.delegate = self;
+    documentController.name = name;
 
     if(scheme == nil || [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:scheme]]) {
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -624,6 +626,15 @@ RCT_EXPORT_METHOD(emitExpiredEvent:(RCTResponseSenderBlock)callback)
 {
     [RNFetchBlobNetwork emitExpiredTasks];
 }
+
+#pragma mark - fs.open
+RCT_EXPORT_METHOD(openFileHandle:(NSString *)uri
+                  mode:(nonnull NSNumber*)mode
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject
+{
+    // TODO
+})
 
 
 

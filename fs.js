@@ -9,9 +9,16 @@ import RNFetchBlobSession from './class/RNFetchBlobSession'
 import RNFetchBlobWriteStream from './class/RNFetchBlobWriteStream'
 import RNFetchBlobReadStream from './class/RNFetchBlobReadStream'
 import RNFetchBlobFile from './class/RNFetchBlobFile'
+import RNFetchBlobFileHandle from './class/RNFetchBlobFileHandle'
 
-const RNFetchBlob: RNFetchBlobNative = NativeModules.RNFetchBlob
+import type {
+  RNFetchBlobNative,
+  RNFetchBlobConfig,
+  RNFetchBlobStream
+} from './types'
 
+const RNFetchBlob:RNFetchBlobNative = NativeModules.RNFetchBlob
+const emitter = DeviceEventEmitter
 const dirs = {
   DocumentDir :  RNFetchBlob.DocumentDir,
   CacheDir : RNFetchBlob.CacheDir,
@@ -396,6 +403,10 @@ function df(): Promise<{ free: number, total: number }> {
         resolve(stat)
     })
   })
+}
+
+function open(uri:String, mode:'r' | 'rw' | 'w'):Promise<number> {
+  return RNFetchBlobFileHandle.create(uri, mode)
 }
 
 export default {
