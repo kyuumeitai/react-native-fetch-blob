@@ -27,8 +27,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import okhttp3.JavaNetCookieJar;
-import okhttp3.OkHttpClient;
+import expolib_v1.okhttp3.JavaNetCookieJar;
+import expolib_v1.okhttp3.OkHttpClient;
 
 import static android.app.Activity.RESULT_OK;
 import static com.RNFetchBlob.RNFetchBlobConst.GET_CONTENT_INTENT;
