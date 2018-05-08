@@ -8,8 +8,10 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.StatFs;
 import android.os.SystemClock;
+import android.support.annotation.Nullable;
 import android.util.Base64;
 
+import com.RNFetchBlob.Utils.DataConverter;
 import com.RNFetchBlob.Utils.PathResolver;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
@@ -20,7 +22,14 @@ import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
@@ -30,13 +39,18 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-class RNFetchBlobFS {
+import static com.RNFetchBlob.RNFetchBlobOpenFile.*;
 
-    private ReactApplicationContext mCtx;
-    private DeviceEventManagerModule.RCTDeviceEventEmitter emitter;
-    private String encoding = "base64";
-    private OutputStream writeStreamInstance = null;
-    private static HashMap<String, RNFetchBlobFS> fileStreams = new HashMap<>();
+public class RNFetchBlobFS {
+
+    ReactApplicationContext mCtx;
+    DeviceEventManagerModule.RCTDeviceEventEmitter emitter;
+    String encoding = "base64";
+    boolean append = false;
+    OutputStream writeStreamInstance = null;
+    static HashMap<String, RNFetchBlobFS> fileStreams = new HashMap<>();
+    static HashMap<Integer, RNFetchBlobOpenFile> fileHandles = new HashMap<>();
+
 
     RNFetchBlobFS(ReactApplicationContext ctx) {
         this.mCtx = ctx;
@@ -72,22 +86,14 @@ class RNFetchBlobFS {
             FileOutputStream fout = new FileOutputStream(f, append);
             // write data from a file
             if(encoding.equalsIgnoreCase(RNFetchBlobConst.DATA_ENCODE_URI)) {
-                String normalizedData = normalizePath(data);
-                File src = new File(normalizedData);
-                if (!src.exists()) {
-                    promise.reject("ENOENT", "No such file '" + path + "' " + "('" + normalizedData + "')");
-                    fout.close();
-                    return;
+                try {
+                    written = writeFileToFileWithOffset(data, path, 0, append);
+                    promise.resolve(written);
                 }
-                FileInputStream fin = new FileInputStream(src);
-                byte[] buffer = new byte [10240];
-                int read;
-                written = 0;
-                while((read = fin.read(buffer)) > 0) {
-                    fout.write(buffer, 0, read);
-                    written += read;
+                catch(Exception ex) {
+                    ex.printStackTrace();
+                    promise.reject("RNfetchBlob writeFileError", ex.getMessage());
                 }
-                fin.close();
             }
             else {
                 byte[] bytes = stringToBytes(data, encoding);
@@ -102,6 +108,22 @@ class RNFetchBlobFS {
         } catch (Exception e) {
             promise.reject("EUNSPECIFIED", e.getLocalizedMessage());
         }
+    }
+
+    static int writeFileToFileWithOffset(String source, String dest, int offset, boolean append) throws IOException {
+
+        source = normalizePath(source);
+        FileOutputStream fout = new FileOutputStream(dest, append);
+        FileInputStream fin = new FileInputStream(source);
+        byte [] buffer = new byte [10240];
+        int read;
+        int written = 0;
+        while((read = fin.read(buffer)) > 0) {
+            fout.write(buffer, offset + written, read);
+            written += read;
+        }
+        fin.close();
+        return written;
     }
 
     /**
@@ -129,11 +151,7 @@ class RNFetchBlobFS {
             }
 
             FileOutputStream os = new FileOutputStream(f, append);
-            byte[] bytes = new byte[data.size()];
-            for(int i=0;i<data.size();i++) {
-                bytes[i] = (byte) data.getInt(i);
-            }
-            os.write(bytes);
+            os.write(DataConverter.RCTArrayToBytes(data));
             os.close();
             promise.resolve(data.size());
         } catch (FileNotFoundException e) {
@@ -429,7 +447,8 @@ class RNFetchBlobFS {
      * @param data  Data chunk in string format
      * @param callback JS context callback
      */
-    static void writeChunk(String streamId, String data, Callback callback) {
+    static void writeStreamChunk(String streamId, String data, Callback callback) {
+
         RNFetchBlobFS fs = fileStreams.get(streamId);
         OutputStream stream = fs.writeStreamInstance;
         byte[] chunk = RNFetchBlobFS.stringToBytes(data, fs.encoding);
@@ -544,6 +563,7 @@ class RNFetchBlobFS {
         path = normalizePath(path);
         InputStream in = null;
         OutputStream out = null;
+        String message = "";
 
         try {
             if(!isPathExists(path)) {
@@ -567,7 +587,7 @@ class RNFetchBlobFS {
                 out.write(buf, 0, len);
             }
         } catch (Exception err) {
-            callback.invoke(err.getLocalizedMessage());
+            message += err.getLocalizedMessage();
         } finally {
             try {
                 if (in != null) {
@@ -576,10 +596,15 @@ class RNFetchBlobFS {
                 if (out != null) {
                     out.close();
                 }
-                callback.invoke();
             } catch (Exception e) {
-                callback.invoke(e.getLocalizedMessage());
+                message += e.getLocalizedMessage();
             }
+        }
+
+        if (message != "") {
+            callback.invoke(message);
+        } else {
+            callback.invoke();
         }
     }
 
@@ -1099,6 +1124,12 @@ class RNFetchBlobFS {
         }
         else
             return PathResolver.getRealPathFromURI(RNFetchBlob.RCTContext, uri);
+    }
+
+    static Integer openFile(String path, Mode mode) throws FileNotFoundException {
+        Integer id = ++OpenFileId;
+        RNFetchBlobFS.fileHandles.put(id, new RNFetchBlobOpenFile(path, mode));
+        return id;
     }
 
 }
